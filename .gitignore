@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.token-*
+.env
+data/history*.json
+logs/
+data/bot-*
+data/lucent-*

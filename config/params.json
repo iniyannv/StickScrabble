@@ -1,0 +1,9 @@
+{
+  "aggr": 1.6,
+  "playLen": 7,
+  "futureShare": 0.5,
+  "endAggr": 2.5,
+  "lowBalance": 10,
+  "dumpAt": 1,
+  "samples": 12
+}
