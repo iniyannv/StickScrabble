@@ -23,7 +23,7 @@ for (const m of d.matches) {
   const pl = sorted.findIndex((p: any) => p.botId === me) + 1;
   place.push(pl); score.push(mine.score); if (pl === 1) wins++;
   let real = 0;
-  for (const p of ps) if (p.botId !== me) { const b = d.bots[p.botId]; if (!b.sim) { real++; oppNames[b.name] = (oppNames[b.name] ?? 0) + 1; } }
+  for (const p of ps) if (p.botId !== me) { const b = d.bots[p.botId] ?? { sim: false, name: p.botId }; if (!b.sim) { real++; oppNames[b.name] = (oppNames[b.name] ?? 0) + 1; } }
   oppReal.push(real);
 }
 console.log(`matches ${d.matches.length}  avgPlace ${f(mean(place), 2)}  win ${wins}  avgScore ${f(mean(score))}  real opps/match ${f(mean(oppReal), 2)}`);

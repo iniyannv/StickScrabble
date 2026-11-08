@@ -6,3 +6,5 @@ data/history*.json
 logs/
 data/bot-*
 data/lucent-*
+data/top/
+data/top-history.json

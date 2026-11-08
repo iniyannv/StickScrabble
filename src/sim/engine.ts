@@ -33,6 +33,7 @@ interface Player {
   unseen: number[];
   wordsPlayed: string[];
   tilesWon: number;
+  earlyTiles: number; // tiles won in the first 30 auctions
   spent: number;
 }
 
@@ -41,6 +42,7 @@ export interface MatchResult {
   scores: number[];
   balances: number[];
   tilesWon: number[];
+  earlyTiles: number[];
   spent: number[];
   leftover: number[]; // tiles left unplayed
   rounds: number;
@@ -82,6 +84,7 @@ export function runMatch(lex: Lexicon, seats: Seat[], rng: Rng, auctionType: "Vi
     unseen: [...BAG_COUNTS],
     wordsPlayed: [],
     tilesWon: 0,
+    earlyTiles: 0,
     spent: 0,
   }));
   for (const p of players) {
@@ -155,6 +158,7 @@ export function runMatch(lex: Lexicon, seats: Seat[], rng: Rng, auctionType: "Vi
         w.spent += paid;
         w.rack[letter]!++;
         w.tilesWon++;
+        if (rounds <= 30) w.earlyTiles++;
         if (w.seat.kind === "sim") {
           // findBestPlayable(rack, 3): longest, then lexicographically first.
           let best: string | null = null;
@@ -173,6 +177,7 @@ export function runMatch(lex: Lexicon, seats: Seat[], rng: Rng, auctionType: "Vi
     scores: players.map((p) => p.score),
     balances: players.map((p) => p.balance),
     tilesWon: players.map((p) => p.tilesWon),
+    earlyTiles: players.map((p) => p.earlyTiles),
     spent: players.map((p) => p.spent),
     leftover: players.map((p) => p.rack.reduce((a, b) => a + b, 0)),
     rounds,

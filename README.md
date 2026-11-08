@@ -51,6 +51,19 @@ The server module lives at `spacetimedb/src/game.ts` in clockworklabs/scrabblebo
   - In first-price matches (tournaments can use them), the bid is shaded.
 - **Word play**: hold tiles to build 7+ letter words (3x), cash in a word when the balance runs low, and dump the whole best partition as the bag empties.
 
+## v2 settings (tuned against today's field)
+
+`config/params-v2.json` keeps v1's settings and adds two changes:
+
+- `earlyBoost: 1.3`: bid 30% higher while more than 47 tiles are left in the bag, so the bot builds a 7-letter word earlier.
+- `spendN: 4`, `spendFrac: 0.5`: in the last 4 auctions, bid at least half the balance on any tile that adds points, because leftover coins are worth nothing.
+
+```bash
+PARAMS=config/params-v2.json BOT_NAME=stick npm run forever
+```
+
+`npm run forever` restarts the bot whenever it exits. The simulator's `field` opponents bid from today's clearing prices by letter and match stage (`data/history.json`, from `npm run fetch-history -- --matches 2000`). The `today` lineup is three field bots plus two copies of v1.
+
 ## Simulator and tuning
 
 `src/sim/engine.ts` copies the server's rules: dealing, Vickrey close with random ties, discarded no-bid tiles, the end condition, and the sim bots' exact bidding and word play.

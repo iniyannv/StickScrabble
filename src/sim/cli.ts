@@ -13,6 +13,8 @@ const presets: Record<string, string> = {
   mix: "sim,sim,starter,base,base",
   live: "sim,sim,sim,hist,hist",
   live2: "sim,sim,sim,base,base",
+  field: "field,field,field,field,field",
+  today: "field,field,field,base,base",
 };
 const oppArg = get("opp", "sims");
 const t = performance.now();
@@ -24,6 +26,7 @@ const summary = await runBatch(
     us: JSON.parse(get("us", "{}")),
     base: JSON.parse(get("base", "{}")),
     auctionType: args.includes("--fp") ? "FirstPrice" : "Vickrey",
+    fieldScale: Number(get("field-scale", "1")),
   },
   Number(get("workers", "0")) || undefined,
 );

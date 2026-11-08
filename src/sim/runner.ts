@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { Lexicon } from "../engine/lexicon.js";
 import { mulberry32 } from "../engine/rng.js";
 import { StarterStrategy } from "../strategy/baselines.js";
-import { HistStrategy } from "../strategy/hist.js";
+import { FieldStrategy, HistStrategy } from "../strategy/hist.js";
 import { SmartStrategy, type SmartParams } from "../strategy/smart.js";
 import { SIM_POOL, runMatch, type Seat } from "./engine.js";
 
@@ -21,6 +21,7 @@ export interface BatchSpec {
   us: Partial<SmartParams>;
   base?: Partial<SmartParams>;
   auctionType?: "Vickrey" | "FirstPrice";
+  fieldScale?: number; // bid multiplier for "field" opponents
 }
 
 export interface Summary {
@@ -31,6 +32,9 @@ export interface Summary {
   avgOppScore: number;
   avgBestOpp: number;
   avgTiles: number;
+  avgEarlyTiles: number;
+  freezeRate: number; // share of matches with <= 2 tiles won in the first 30 auctions
+  low60: number; // share of matches scoring under 60
   avgSpent: number;
   avgLeftover: number;
   avgEndBalance: number;
@@ -45,14 +49,14 @@ function lex() {
 
 interface RawStats {
   n: number; score: number; place: number; wins: number; opp: number; bestOpp: number;
-  tiles: number; spent: number; leftover: number; endBal: number; rejected: number;
+  tiles: number; early: number; freeze: number; low: number; spent: number; leftover: number; endBal: number; rejected: number;
   byOpp: Record<string, { n: number; score: number }>;
 }
 
 export function runBatchLocal(spec: BatchSpec): RawStats {
   const L = lex();
   const rng = mulberry32(spec.seed);
-  const st: RawStats = { n: 0, score: 0, place: 0, wins: 0, opp: 0, bestOpp: 0, tiles: 0, spent: 0, leftover: 0, endBal: 0, rejected: 0, byOpp: {} };
+  const st: RawStats = { n: 0, score: 0, place: 0, wins: 0, opp: 0, bestOpp: 0, tiles: 0, early: 0, freeze: 0, low: 0, spent: 0, leftover: 0, endBal: 0, rejected: 0, byOpp: {} };
   const us = new SmartStrategy(L, mulberry32(spec.seed ^ 0x9e3779b9), spec.us, "us");
   for (let m = 0; m < spec.matches; m++) {
     const pool = [...SIM_POOL].sort(() => rng() - 0.5);
@@ -62,6 +66,7 @@ export function runBatchLocal(spec: BatchSpec): RawStats {
       if (tok === "sim") seats.push({ kind: "sim", ...pool.pop()! });
       else if (tok === "starter") seats.push({ kind: "bot", strategy: new StarterStrategy(L) });
       else if (tok === "hist") seats.push({ kind: "bot", strategy: new HistStrategy(L, mulberry32(spec.seed * 17 + m * 5 + bi++)) });
+      else if (tok.startsWith("field")) seats.push({ kind: "bot", strategy: new FieldStrategy(L, mulberry32(spec.seed * 13 + m * 3 + bi++), spec.fieldScale ?? 1) });
       else if (tok === "base") seats.push({ kind: "bot", strategy: new SmartStrategy(L, mulberry32(spec.seed * 31 + m * 7 + bi++), spec.base ?? {}, "base") });
       else throw new Error(`unknown opponent ${tok}`);
     }
@@ -79,6 +84,9 @@ export function runBatchLocal(spec: BatchSpec): RawStats {
     st.opp += others.reduce((a, b) => a + b, 0) / others.length;
     st.bestOpp += Math.max(...others);
     st.tiles += r.tilesWon[me]!;
+    st.early += r.earlyTiles[me]!;
+    if (r.earlyTiles[me]! <= 2) st.freeze++;
+    if (my < 60) st.low++;
     st.spent += r.spent[me]!;
     st.leftover += r.leftover[me]!;
     st.endBal += r.balances[me]!;
@@ -106,6 +114,9 @@ function summarise(st: RawStats): Summary {
     avgOppScore: +(st.opp / n).toFixed(2),
     avgBestOpp: +(st.bestOpp / n).toFixed(2),
     avgTiles: +(st.tiles / n).toFixed(1),
+    avgEarlyTiles: +(st.early / n).toFixed(2),
+    freezeRate: +(st.freeze / n).toFixed(3),
+    low60: +(st.low / n).toFixed(3),
     avgSpent: +(st.spent / n).toFixed(1),
     avgLeftover: +(st.leftover / n).toFixed(2),
     avgEndBalance: +(st.endBal / n).toFixed(1),
@@ -116,7 +127,7 @@ function summarise(st: RawStats): Summary {
 
 function merge(a: RawStats, b: RawStats): RawStats {
   const out = { ...a, byOpp: { ...a.byOpp } };
-  for (const k of ["n", "score", "place", "wins", "opp", "bestOpp", "tiles", "spent", "leftover", "endBal", "rejected"] as const) out[k] = a[k] + b[k];
+  for (const k of ["n", "score", "place", "wins", "opp", "bestOpp", "tiles", "early", "freeze", "low", "spent", "leftover", "endBal", "rejected"] as const) out[k] = a[k] + b[k];
   for (const [k, v] of Object.entries(b.byOpp)) {
     const o = (out.byOpp[k] ??= { n: 0, score: 0 });
     out.byOpp[k] = { n: o.n + v.n, score: o.score + v.score };
