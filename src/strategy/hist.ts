@@ -44,3 +44,61 @@ export class HistStrategy implements Strategy {
     return this.words.chooseWords(v);
   }
 }
+
+// ---- "Field" opponent: bids sampled from recent clearing prices ----
+//
+// Clearing price = what the winner paid (the 2nd-highest bid), bucketed by
+// letter and by how far into the match the auction was. Five of these bots
+// reproduce the prices a 6-bot all-real lobby produces once `scale` is
+// calibrated (see `npm run sim -- --opp field`).
+
+export const PHASES = 7;
+const AUCTIONS = 68; // 98 tiles - 6 * 5 dealt
+
+/** Phase bucket for an auction, from tiles left in the bag after its draw. */
+export function phaseOf(bagRemaining: number): number {
+  const i = Math.max(0, AUCTIONS - 1 - bagRemaining);
+  return Math.min(PHASES - 1, Math.floor((i * PHASES) / AUCTIONS));
+}
+
+let FIELD: number[][][] | null = null;
+
+/** table[letter][phase] = clearing prices seen in recent real-bot auctions. */
+export function fieldTable(file = process.env.FIELD_FILE ?? "data/history.json"): number[][][] {
+  if (FIELD) return FIELD;
+  const h = JSON.parse(fs.readFileSync(file, "utf8"));
+  const t: number[][][] = Array.from({ length: 26 }, () => Array.from({ length: PHASES }, () => []));
+  const byMatch = new Map<string, { auctionId: string; letter: string; winner: string | null; paid: number }[]>();
+  for (const r of h.results) (byMatch.get(r.matchId) ?? byMatch.set(r.matchId, []).get(r.matchId)!).push(r);
+  for (const rs of byMatch.values()) {
+    rs.sort((a, b) => Number(BigInt(a.auctionId) - BigInt(b.auctionId)));
+    rs.forEach((r, i) => {
+      if (r.winner == null || h.bots[r.winner]?.sim) return;
+      const ph = Math.min(PHASES - 1, Math.floor((i * PHASES) / AUCTIONS));
+      t[letterIndex(r.letter)]![ph]!.push(r.paid);
+    });
+  }
+  return (FIELD = t);
+}
+
+export class FieldStrategy implements Strategy {
+  readonly name = "field";
+  private words: SmartStrategy;
+  constructor(
+    lex: Lexicon,
+    private rng: Rng,
+    private scale = 1,
+  ) {
+    this.words = new SmartStrategy(lex, rng);
+  }
+  bid(v: BotView, letter: number): number {
+    if (v.bagRemaining === 0) return 0;
+    const samples = fieldTable()[letter]![phaseOf(v.bagRemaining)]!;
+    if (samples.length === 0) return 0;
+    const b = samples[Math.floor(this.rng() * samples.length)]! * this.scale;
+    return Math.min(v.balance, Math.round(b));
+  }
+  chooseWords(v: BotView): string[] {
+    return this.words.chooseWords(v);
+  }
+}

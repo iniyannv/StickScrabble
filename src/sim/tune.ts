@@ -14,6 +14,8 @@ const presets: Record<string, string> = {
   mix: "sim,starter,base,base,base",
   live: "sim,sim,sim,hist,hist",
   live2: "sim,sim,sim,base,base",
+  field: "field,field,field,field,field",
+  today: "field,field,field,base,base",
 };
 const opp = (presets[get("opp", "self")] ?? get("opp", "self")).split(",");
 const matches = Number(get("matches", "400"));
@@ -22,12 +24,12 @@ let current: Partial<SmartParams> = JSON.parse(get("start", "{}"));
 const baseFixed = args.includes("--base") ? JSON.parse(get("base", "{}")) : null;
 
 async function evalParams(us: Partial<SmartParams>, base: Partial<SmartParams>): Promise<Summary> {
-  return runBatch({ matches, seed, opponents: opp, us, base, auctionType: args.includes("--fp") ? "FirstPrice" : "Vickrey" });
+  return runBatch({ matches, seed, opponents: opp, us, base, auctionType: args.includes("--fp") ? "FirstPrice" : "Vickrey", fieldScale: Number(get("field-scale", "1")) });
 }
 
 function line(label: string, s: Summary) {
   console.log(
-    `${label.padEnd(28)} place ${s.avgPlace.toFixed(3)}  win ${(s.winRate * 100).toFixed(1)}%  score ${s.avgScore.toFixed(1)}  opp ${s.avgOppScore.toFixed(1)}  tiles ${s.avgTiles}  spent ${s.avgSpent}  endBal ${s.avgEndBalance}  left ${s.avgLeftover}`,
+    `${label.padEnd(28)} place ${s.avgPlace.toFixed(3)}  win ${(s.winRate * 100).toFixed(1)}%  score ${s.avgScore.toFixed(1)}  opp ${s.avgOppScore.toFixed(1)}  tiles ${s.avgTiles}  early ${s.avgEarlyTiles}  freeze ${(s.freezeRate * 100).toFixed(0)}%  low60 ${(s.low60 * 100).toFixed(0)}%  spent ${s.avgSpent}  endBal ${s.avgEndBalance}  left ${s.avgLeftover}`,
   );
 }
 

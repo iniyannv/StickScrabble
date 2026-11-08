@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "tsx src/bot/index.ts",
+    "forever": "scripts/run-forever.sh",
     "sim": "tsx src/sim/cli.ts",
     "tune": "tsx src/sim/tune.ts",
     "bench": "tsx scripts/bench.ts",

@@ -48,6 +48,13 @@ function loadParams(): Partial<SmartParams> {
 
 const lex = Lexicon.load();
 const strategy = new SmartStrategy(lex, mulberry32(Date.now() & 0xffffffff), loadParams(), BOT_NAME);
+// Small tables (tournament finals): the v3 bid floors overpay when few bots bid. Simulated
+// head-to-head, v3.1 wins 16% of 2-bot and 14% of 3-bot matches vs v1, but beats v1 at 6 bots.
+const SMALL_MAX = Number(process.env.SMALL_MAX ?? "3");
+const SMALL_PARAMS_PATH = process.env.PARAMS_SMALL ?? path.join(process.cwd(), "config", "params.json");
+const smallStrategy = new SmartStrategy(lex, mulberry32((Date.now() ^ 0x5bd1e995) & 0xffffffff), JSON.parse(fs.readFileSync(SMALL_PARAMS_PATH, "utf8")), BOT_NAME);
+log(`small-table params (<= ${SMALL_MAX} bots) from ${SMALL_PARAMS_PATH}`);
+const pick = (n: number) => (n <= SMALL_MAX ? smallStrategy : strategy);
 log(`lexicon ready: ${lex.words.length} anagram classes`);
 
 let conn: DbConnection | null = null;
@@ -135,7 +142,7 @@ function onAuctionOpen(c: DbConnection, auctionId: bigint, matchId: bigint, lett
 
   // 1. Words first: the server applies our reducer calls in order, so the
   //    bid below can spend what these earn.
-  const words = strategy.chooseWords(v);
+  const words = pick(v.numPlayers).chooseWords(v);
   for (const w of words) {
     const need = emptyCounts();
     for (let i = 0; i < w.length; i++) need[w.charCodeAt(i) - A_CODE]!++;
@@ -150,9 +157,10 @@ function onAuctionOpen(c: DbConnection, auctionId: bigint, matchId: bigint, lett
 
   // 2. Bid.
   const L = letterIndex(letter);
-  const amount = Math.max(0, Math.min(Math.floor(strategy.bid(v, L)), v.balance));
+  const amount = Math.max(0, Math.min(Math.floor(pick(v.numPlayers).bid(v, L)), v.balance));
   const computeMs = performance.now() - t0;
   const msLeft = Number(closesAtMicros / 1000n) - Date.now();
+  if (computeMs > 400 || msLeft < 150) log(`WARNING: slow decision (${computeMs.toFixed(0)}ms, ${msLeft}ms left)`);
   log(
     `match ${matchId} r${built.auctionLetters} bag ${v.bagRemaining} '${letter}': bid ${amount} ` +
       `(bal ${v.balance}, score ${v.score}, rack ${countsToString(v.rack)}) ${computeMs.toFixed(0)}ms, ~${msLeft}ms left`,
